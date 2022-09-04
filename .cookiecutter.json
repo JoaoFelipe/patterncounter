@@ -1,0 +1,13 @@
+{
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Joao Felipe Pimentel",
+  "copyright_year": "2022",
+  "development_status": "Development Status :: 4 - Beta",
+  "email": "joaofelipenp@gmail.com",
+  "friendly_name": "PatternCounter",
+  "github_user": "JoaoFelipe",
+  "license": "MIT",
+  "package_name": "patterncounter",
+  "project_name": "patterncounter",
+  "version": "0.0.1"
+}
