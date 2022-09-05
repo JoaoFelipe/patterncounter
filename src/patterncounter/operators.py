@@ -4,7 +4,26 @@ from __future__ import annotations
 from abc import ABCMeta
 from abc import abstractmethod
 from itertools import product
+from typing import Any
 from typing import Generator
+from typing import Iterable
+
+from patterncounter.sequences import TSequence
+
+from .visitor import Visitor
+
+
+def _show(rules: Iterable[Rule], sep: str) -> str:
+    """Converts rules to repr with parentheses."""
+    first, *rest = rules
+    result = [repr(first), sep]
+    if len(rest) == 1:
+        result.append(repr(rest[0]))
+    else:
+        result.append("(")
+        result.append(_show(rest, sep))
+        result.append(")")
+    return "".join(result)
 
 
 class Rule(metaclass=ABCMeta):
@@ -12,11 +31,15 @@ class Rule(metaclass=ABCMeta):
 
     @abstractmethod
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
 
-    def check(self, sequence: list[list[str]]) -> bool:
+    @abstractmethod
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+
+    def check(self, sequence: TSequence) -> bool:
         """Checks if operator matches a pattern."""
         for _ in self.find_positions(sequence):
             return True
@@ -54,7 +77,7 @@ class Slice(Rule):
         self.open_last = int(open_last)
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         first = None
@@ -75,6 +98,10 @@ class Slice(Rule):
             ):
                 yield (first + start, len(sequence) - 1 + start)
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_slice(self)
+
     def __lshift__(self, other: Rule) -> Slice:
         """Rule << Rule. Checks rule inside slice."""
         self.subrules.append(other)
@@ -89,6 +116,20 @@ class Slice(Rule):
             self.open_last,
         ) == (other.element, other.subrules, other.open_first, other.open_last)
 
+    def __repr__(self) -> str:
+        """Represents rule."""
+        result = []
+        result.append("{" if self.open_first else "[")
+        result.append(self.element)
+        for rule in self.subrules:
+            result.append(f" {rule!r}")
+        result.append("}" if self.open_last else "]")
+        return "".join(result)
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
+
 
 class Has(Rule):
     """Has operator for finding elements in the sequence."""
@@ -98,16 +139,28 @@ class Has(Rule):
         self.element = element
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         for i, moment in enumerate(sequence):
             if self.element in moment:
                 yield (i + start, i + start)
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_has(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Has) and self.element == other.element
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return self.element
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class Sequence(Rule):
@@ -115,11 +168,11 @@ class Sequence(Rule):
 
     def __init__(self, *rules: Rule, same: bool = False):
         """Initializes Sequence."""
-        self.rules = rules
+        self.rules: Iterable[Rule] = rules
         self.same = same
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         rule_pos = [rule.find_positions(sequence, start) for rule in self.rules]
@@ -132,6 +185,10 @@ class Sequence(Rule):
             else:
                 yield (positions[0][0], positions[-1][-1])
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_sequence(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Sequence) and (self.rules, self.same) == (
@@ -139,16 +196,24 @@ class Sequence(Rule):
             other.same,
         )
 
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return _show(self.rules, " => " if self.same else " -> ")
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
+
 
 class And(Rule):
     """And operator for combining rules."""
 
     def __init__(self, *rules: Rule):
         """Initializes And."""
-        self.rules = rules
+        self.rules: Iterable[Rule] = rules
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         rule_pos = [list(rule.find_positions(sequence, start)) for rule in self.rules]
@@ -157,9 +222,22 @@ class And(Rule):
             maximum = max(pos[-1] for rule in rule_pos for pos in rule)
             yield (minimum, maximum)
 
+    def accept(self, visitor: Any) -> Any:
+        """Visits rule."""
+        return visitor.visit_and(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, And) and self.rules == other.rules
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        reprs = [repr(rule) for rule in self.rules]
+        return f"({' '.join(reprs)})"
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class Or(Rule):
@@ -167,10 +245,10 @@ class Or(Rule):
 
     def __init__(self, *rules: Rule):
         """Initializes Or."""
-        self.rules = rules
+        self.rules: Iterable[Rule] = rules
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         rule_pos = [list(rule.find_positions(sequence, start)) for rule in self.rules]
@@ -179,9 +257,21 @@ class Or(Rule):
             maximum = max(pos[-1] for rule in rule_pos for pos in rule)
             yield (minimum, maximum)
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_or(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Or) and self.rules == other.rules
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return _show(self.rules, " | ")
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class Not(Rule):
@@ -192,16 +282,28 @@ class Not(Rule):
         self.rule = rule
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         for _ in self.rule.find_positions(sequence, start):
             return
         yield (start, len(sequence) + start - 1)
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_not(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Not) and self.rule == other.rule
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return f"~{self.rule!r}"
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class Intersect(Rule):
@@ -209,10 +311,10 @@ class Intersect(Rule):
 
     def __init__(self, *rules: Rule):
         """Initializes Intersect."""
-        self.rules = rules
+        self.rules: Iterable[Rule] = rules
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         rule_pos = [list(rule.find_positions(sequence, start)) for rule in self.rules]
@@ -229,9 +331,21 @@ class Intersect(Rule):
             else:
                 yield (minimum, maximum)
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_intersect(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Intersect) and self.rules == other.rules
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return _show(self.rules, " & ")
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class First(Rule):
@@ -242,16 +356,28 @@ class First(Rule):
         self.rule = rule
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         for pos in self.rule.find_positions(sequence, start):
             if pos[0] == start:
                 yield pos
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_first(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, First) and self.rule == other.rule
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return f"^{self.rule!r}"
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))
 
 
 class Last(Rule):
@@ -262,13 +388,25 @@ class Last(Rule):
         self.rule = rule
 
     def find_positions(
-        self, sequence: list[list[str]], start: int = 0
+        self, sequence: TSequence, start: int = 0
     ) -> Generator[tuple[int, int], None, None]:
         """Generates position for matching elements."""
         for pos in self.rule.find_positions(sequence, start):
             if pos[-1] == len(sequence) + start - 1:
                 yield pos
 
+    def accept(self, visitor: Visitor) -> Any:
+        """Visits rule."""
+        return visitor.visit_last(self)
+
     def __eq__(self, other: object) -> bool:
         """Checks equality."""
         return isinstance(other, Last) and self.rule == other.rule
+
+    def __repr__(self) -> str:
+        """Represents rule."""
+        return f"${self.rule!r}"
+
+    def __hash__(self) -> int:
+        """Returns rule hash based on repr string."""
+        return hash(repr(self))

@@ -1,5 +1,4 @@
 """Test cases for the operators module."""
-from typing import Generator
 from typing import List
 from typing import Tuple
 
@@ -198,19 +197,6 @@ def test_intersect_operator() -> None:
         Slice("A") ^ Slice("B"), [["A"], ["A", "B"], ["A", "B"], ["B", "C"], ["A"]]
     ) == [(1, 2)]
 
-    # Coverage
-    class Temp(Rule):
-        def find_positions(
-            self, sequence: list[list[str]], start: int = 0
-        ) -> Generator[tuple[int, int], None, None]:
-            yield (0, 0)
-            yield (2, 2)
-
-    assert find(Intersect(Slice("A"), Temp()), [["A"], ["A"], ["A"]]) == [
-        (0, 0),
-        (2, 2),
-    ]
-
 
 def test_first_operator() -> None:
     """First requires rule to be at the start of sequence or group."""
@@ -258,3 +244,45 @@ def test_equality() -> None:
     assert Intersect(Has("A"), Has("B")) == Intersect(Has("A"), Has("B"))
     assert First(Has("A")) == First(Has("A"))
     assert Last(Has("A")) == Last(Has("A"))
+
+
+def test_repr() -> None:
+    """All operators should define __repr__."""
+    assert repr(Has("A")) == "A"
+    assert repr(Slice("A")) == "[A]"
+    assert repr(Slice("A", open_first=True)) == "{A]"
+    assert repr(Slice("A", open_last=True)) == "[A}"
+    assert repr(Slice("A") << Has("B")) == "[A B]"
+    assert repr(Sequence(Has("A"), Has("B"))) == "A -> B"
+    assert repr(Sequence(Has("A"), Has("B"), same=True)) == "A => B"
+    assert repr(Sequence(Has("A"), Has("B"), Has("C"))) == "A -> (B -> C)"
+    assert repr(And(Has("A"), Has("B"))) == "(A B)"
+    assert repr(And(Has("A"), Has("B"), Has("C"))) == "(A B C)"
+    assert repr(Or(Has("A"), Has("B"))) == "A | B"
+    assert repr(Or(Has("A"), Has("B"), Has("C"))) == "A | (B | C)"
+    assert repr(Not(Has("A"))) == "~A"
+    assert repr(First(Has("A"))) == "^A"
+    assert repr(Last(Has("A"))) == "$A"
+    assert repr(Intersect(Has("A"), Has("B"))) == "A & B"
+    assert repr(Intersect(Has("A"), Has("B"), Has("C"))) == "A & (B & C)"
+
+
+def test_hash() -> None:
+    """All operators should define __hash__."""
+    assert hash(Has("A")) == hash("A")
+    assert hash(Slice("A")) == hash("[A]")
+    assert hash(Slice("A", open_first=True)) == hash("{A]")
+    assert hash(Slice("A", open_last=True)) == hash("[A}")
+    assert hash(Slice("A") << Has("B")) == hash("[A B]")
+    assert hash(Sequence(Has("A"), Has("B"))) == hash("A -> B")
+    assert hash(Sequence(Has("A"), Has("B"), same=True)) == hash("A => B")
+    assert hash(Sequence(Has("A"), Has("B"), Has("C"))) == hash("A -> (B -> C)")
+    assert hash(And(Has("A"), Has("B"))) == hash("(A B)")
+    assert hash(And(Has("A"), Has("B"), Has("C"))) == hash("(A B C)")
+    assert hash(Or(Has("A"), Has("B"))) == hash("A | B")
+    assert hash(Or(Has("A"), Has("B"), Has("C"))) == hash("A | (B | C)")
+    assert hash(Not(Has("A"))) == hash("~A")
+    assert hash(First(Has("A"))) == hash("^A")
+    assert hash(Last(Has("A"))) == hash("$A")
+    assert hash(Intersect(Has("A"), Has("B"))) == hash("A & B")
+    assert hash(Intersect(Has("A"), Has("B"), Has("C"))) == hash("A & (B & C)")
