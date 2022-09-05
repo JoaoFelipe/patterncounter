@@ -13,11 +13,11 @@ from typing import Tuple
 from typing import Union
 from typing import cast
 
-from patterncounter.operators import Rule
-from patterncounter.sequences import TSequence
-from patterncounter.sequences import in_out_sequence
-from patterncounter.visitor import ReplaceVariables
-from patterncounter.visitor import create_replace
+from .operators import Rule
+from .sequences import TSequence
+from .sequences import in_out_sequence
+from .visitor import ReplaceVariables
+from .visitor import create_replace
 
 
 def possible_bindings(variable: str, all_names: set[str]) -> tuple[str, set[str]]:

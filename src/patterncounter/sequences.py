@@ -69,3 +69,13 @@ def in_out_sequence(
                 interval.append(out_prefix + element)
         current = elements
     return newsequence, all_names
+
+
+def sequence_to_text(sequence: TSequence, config: Config) -> str:
+    """Converts sequence to text."""
+    return (
+        f" {config.intervalsep} ".join(
+            [config.elementsep.join(group) for group in sequence]
+        )
+        + f" {config.intervalsep} {config.linesep}"
+    )

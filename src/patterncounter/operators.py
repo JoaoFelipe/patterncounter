@@ -8,8 +8,7 @@ from typing import Any
 from typing import Generator
 from typing import Iterable
 
-from patterncounter.sequences import TSequence
-
+from .sequences import TSequence
 from .visitor import Visitor
 
 
