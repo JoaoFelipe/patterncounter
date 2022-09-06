@@ -15,6 +15,8 @@ maxdepth: 1
 ---
 
 usage
+rules
+variables
 reference
 contributing
 Code of Conduct <codeofconduct>
