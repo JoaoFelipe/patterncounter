@@ -1,5 +1,6 @@
 """Test cases for the __main__ module."""
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -65,12 +66,17 @@ def test_count_succeeds_single_rule_csv(runner: CliRunner) -> None:
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
-    assert result.output == dedent(
-        """\
+    assert (
+        result.output
+        == dedent(
+            """\
         Name,Support,Lines,Bindings
         X,0.6666666666666666,0; 2,
         B,0.6666666666666666,0; 2,X = B
         """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
     )
 
 
@@ -120,19 +126,24 @@ def test_count_succeeds_csv(runner: CliRunner) -> None:
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
-    assert result.output == dedent(
-        """\
+    assert (
+        result.output
+        == dedent(
+            """\
         LHS,RHS,LHS Support,RHS Support,LHS ==> RHS Support,"""
-        """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
+            """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
         [Y X],A,0.6666666666666666,1.0,0.6666666666666666,"""
-        """1.0,1.0,0; 2,0; 1; 2,0; 2,
+            """1.0,1.0,0; 2,0; 1; 2,0; 2,
         A,[Y X],1.0,0.6666666666666666,0.6666666666666666,"""
-        """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,
+            """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,
         [A B],A,0.6666666666666666,1.0,0.6666666666666666,"""
-        """1.0,1.0,0; 2,0; 1; 2,0; 2,X = B; Y = A
+            """1.0,1.0,0; 2,0; 1; 2,0; 2,X = B; Y = A
         A,[A B],1.0,0.6666666666666666,0.6666666666666666,"""
-        """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,X = B; Y = A
+            """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,X = B; Y = A
         """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
     )
 
 
@@ -207,11 +218,16 @@ def test_count_succeeds_single_rule_no_bindings_csv(runner: CliRunner) -> None:
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
-    assert result.output == dedent(
-        """\
+    assert (
+        result.output
+        == dedent(
+            """\
         Name,Support,Lines,Bindings
         X,0.6666666666666666,0; 2,
         """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
     )
 
 
@@ -223,15 +239,20 @@ def test_count_succeeds_no_bindings_csv(runner: CliRunner) -> None:
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
-    assert result.output == dedent(
-        """\
+    assert (
+        result.output
+        == dedent(
+            """\
         LHS,RHS,LHS Support,RHS Support,LHS ==> RHS Support,"""
-        """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
+            """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
         [Y X],A,0.6666666666666666,1.0,0.6666666666666666,"""
-        """1.0,1.0,0; 2,0; 1; 2,0; 2,
+            """1.0,1.0,0; 2,0; 1; 2,0; 2,
         A,[Y X],1.0,0.6666666666666666,0.6666666666666666,"""
-        """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,
+            """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,
         """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
     )
 
 
@@ -274,13 +295,18 @@ def test_count_show_zero_csv(runner: CliRunner) -> None:
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
-    assert result.output == dedent(
-        """\
+    assert (
+        result.output
+        == dedent(
+            """\
         LHS,RHS,LHS Support,RHS Support,LHS ==> RHS Support,"""
-        """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
+            """Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings
         A,b,1.0,0.0,0.0,0.0,nan,0; 1; 2,,,
         b,A,0.0,1.0,0.0,nan,nan,,0; 1; 2,,
         """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
     )
 
 
@@ -299,7 +325,9 @@ def test_count_single_nothing_found_csv(runner: CliRunner) -> None:
         __main__.count, ["Z", "--csv"], input="A -1 A B -1 -2 A -1 -2 A B -1 -2"
     )
     assert result.exit_code == 0
-    assert result.output == "Name,Support,Lines,Bindings\n"
+    assert result.output == ("Name,Support,Lines,Bindings\n").replace(
+        "\r\n", "\n"
+    ).replace("\n", os.linesep)
 
 
 def test_count_multiple_nothing_found_csv(runner: CliRunner) -> None:
@@ -311,7 +339,7 @@ def test_count_multiple_nothing_found_csv(runner: CliRunner) -> None:
     assert result.output == (
         "LHS,RHS,LHS Support,RHS Support,LHS ==> RHS Support,"
         "Confidence,Lift,LHS Lines,RHS Lines,LHS ==> RHS Lines,Bindings\n"
-    )
+    ).replace("\r\n", "\n").replace("\n", os.linesep)
 
 
 def test_convert_items_filtering(runner: CliRunner) -> None:
