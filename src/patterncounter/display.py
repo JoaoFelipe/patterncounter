@@ -9,8 +9,8 @@ from typing import cast
 
 from .counter import AssociationItem
 from .counter import AssociationRule
-from .counter import TPatternList
 from .counter import Number
+from .counter import TPatternList
 from .sequences import Config
 from .sequences import TSequence
 from .sequences import sequence_to_text
@@ -59,11 +59,12 @@ def display_patterns(
     sequences: Sequence[TSequence],
     patterns: TPatternList,
     config: Config | None = None,
+    default_prefix: str = "",
 ) -> None:
     """Displays patterns found by mine_patterns."""
     config = config or Config()
     for item, association_rules, binds in patterns:
-        prefix = ""
+        prefix = default_prefix
         if binds:
             if config.hide_bindings:
                 continue
@@ -71,8 +72,8 @@ def display_patterns(
                 f"{var} = {value}"
                 for var, value in cast(Sequence[Tuple[str, str]], binds)
             )
-            print(f"\n[BINDING: {variables}]")
-            prefix = "  "
+            print(f"\n{default_prefix}[BINDING: {variables}]")
+            prefix += "  "
 
         print_rules(item, association_rules, sequences, config, prefix=prefix)
 
@@ -82,8 +83,9 @@ def create_single_row(
     name: str,
     support: str | Number,
     line_count: str | Number,
-    lines: str | Number,
-    bindings: str | Number
+    lines: str,
+    bindings: str,
+    source: str,
 ) -> list[str | Number]:
     """Create row for patterns csv."""
     row: list[str | Number] = [name, support]
@@ -92,19 +94,32 @@ def create_single_row(
     if config.show_text:
         row.append(lines)
     row.append(bindings)
+    if source:
+        row.append(source)
     return row
 
 
 def display_single_rule_csv(
     patterns: TPatternList,
+    first: bool = True,
+    source: str = "",
     config: Config | None = None,
 ) -> None:
     """Displays patterns of a single rule found by mine_patterns as csv."""
     config = config or Config()
     writer = csv.writer(sys.stdout)
-    writer.writerow(create_single_row(
-        config, "Name", "Support", "Line Count", "Lines", "Bindings"
-    ))
+    if first:
+        writer.writerow(
+            create_single_row(
+                config,
+                "Name",
+                "Support",
+                "Line Count",
+                "Lines",
+                "Bindings",
+                "Source" if source else "",
+            )
+        )
     for item, _, binds in patterns:
         if config.hide_support_zero and item.support == 0:
             continue
@@ -116,10 +131,17 @@ def display_single_rule_csv(
                 f"{var} = {value}"
                 for var, value in cast(Sequence[Tuple[str, str]], binds)
             )
-        writer.writerow(create_single_row(
-            config, item.name, item.support, 
-            len(item.lines), "; ".join(map(str, item.lines)), variables
-        ))
+        writer.writerow(
+            create_single_row(
+                config,
+                item.name,
+                item.support,
+                len(item.lines),
+                "; ".join(map(str, item.lines)),
+                variables,
+                source,
+            )
+        )
 
 
 def create_multiple_row(
@@ -134,10 +156,11 @@ def create_multiple_row(
     rule_line_count: str | Number,
     confidence: str | Number,
     lift: str | Number,
-    lhs_lines: str | Number,
-    rhs_lines: str | Number,
-    rule_lines: str | Number,
-    bindings: str | Number
+    lhs_lines: str,
+    rhs_lines: str,
+    rule_lines: str,
+    bindings: str,
+    source: str,
 ) -> list[str | Number]:
     """Create row for association rules csv."""
     row: list[str | Number] = [lhs, rhs, lhs_support, rhs_support, rule_support]
@@ -147,32 +170,41 @@ def create_multiple_row(
     if config.show_text:
         row += [lhs_lines, rhs_lines, rule_lines]
     row.append(bindings)
+    if source:
+        row.append(source)
     return row
+
 
 def display_multiple_rule_csv(
     patterns: TPatternList,
+    first: bool = True,
+    source: str = "",
     config: Config | None = None,
 ) -> None:
     """Displays patterns of multiple rules found by mine_patterns as csv."""
     config = config or Config()
     writer = csv.writer(sys.stdout)
-    writer.writerow(create_multiple_row(
-        config,
-        "LHS",
-        "RHS",
-        "LHS Support",
-        "RHS Support",
-        "LHS ==> RHS Support",
-        "LHS Line Count",
-        "RHS Line Count",
-        "LHS ==> RHS Line Count",
-        "Confidence",
-        "Lift",
-        "LHS Lines",
-        "RHS Lines",
-        "LHS ==> RHS Lines",
-        "Bindings"
-    ))
+    if first:
+        writer.writerow(
+            create_multiple_row(
+                config,
+                "LHS",
+                "RHS",
+                "LHS Support",
+                "RHS Support",
+                "LHS ==> RHS Support",
+                "LHS Line Count",
+                "RHS Line Count",
+                "LHS ==> RHS Line Count",
+                "Confidence",
+                "Lift",
+                "LHS Lines",
+                "RHS Lines",
+                "LHS ==> RHS Lines",
+                "Bindings",
+                "Source" if source else "",
+            )
+        )
     for item, association_rules, binds in patterns:
         if config.hide_support_zero and item.support == 0:
             continue
@@ -185,20 +217,23 @@ def display_multiple_rule_csv(
                 for var, value in cast(Sequence[Tuple[str, str]], binds)
             )
         for arule in association_rules:
-            writer.writerow(create_multiple_row(
-                config,
-                arule.lhs.name,
-                arule.rhs.name,
-                arule.lhs.support,
-                arule.rhs.support,
-                item.support,
-                len(arule.lhs.lines),
-                len(arule.rhs.lines),
-                len(item.lines),
-                arule.confidence,
-                arule.lift,
-                "; ".join(map(str, arule.lhs.lines)),
-                "; ".join(map(str, arule.rhs.lines)),
-                "; ".join(map(str, item.lines)),
-                variables,
-            ))
+            writer.writerow(
+                create_multiple_row(
+                    config,
+                    arule.lhs.name,
+                    arule.rhs.name,
+                    arule.lhs.support,
+                    arule.rhs.support,
+                    item.support,
+                    len(arule.lhs.lines),
+                    len(arule.rhs.lines),
+                    len(item.lines),
+                    arule.confidence,
+                    arule.lift,
+                    "; ".join(map(str, arule.lhs.lines)),
+                    "; ".join(map(str, arule.rhs.lines)),
+                    "; ".join(map(str, item.lines)),
+                    variables,
+                    source,
+                )
+            )

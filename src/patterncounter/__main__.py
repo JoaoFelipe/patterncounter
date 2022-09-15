@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sys
 from typing import IO
+from typing import Generator
 from typing import Sequence
 
 import click
@@ -27,13 +28,53 @@ def file_or_stdin(file: IO[str] | None) -> str:
     return file.read()
 
 
+def process_patterns(
+    pattern_definitions: Sequence[str],
+) -> tuple[Sequence[str], Sequence[str]]:
+    """Processes pattern definitions."""
+    var: list[str] = []
+    rules: list[str] = []
+
+    collecting_var = False
+    for element in pattern_definitions:
+        if element.lower() in ("-v", "--var"):
+            collecting_var = True
+        elif collecting_var:
+            var.append(element)
+            collecting_var = False
+        else:
+            rules.append(element)
+            collecting_var = False
+    return rules, var
+
+
+def split_patterns(
+    pattern_definitions: Sequence[str],
+) -> Generator[tuple[Sequence[str], str], None, None]:
+    """Splits patterns by +."""
+    current: list[str] = []
+    has_from = False
+    for element in pattern_definitions:
+        if element == "+":
+            yield current, " ".join(current)
+            has_from = True
+            current = []
+        else:
+            current.append(element)
+    yield current, " ".join(current) if has_from else ""
+
+
 @click.group()
 @click.version_option()
 def main() -> None:
     """PatternCounter. This tool counts patterns from lists of sequences."""
 
 
-@main.command()
+@main.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+    )
+)
 @click.option("--line-sep", "-l", default="-2", help="line separator")
 @click.option("--interval-sep", "-i", default="-1", help="interval separator")
 @click.option("--element-sep", "-e", default=" ", help="element separator")
@@ -66,9 +107,8 @@ def main() -> None:
 )
 @click.option("--line-text", "-t", is_flag=True, default=False, help="show line text")
 @click.option("--file", "-f", type=click.File("r"), help="load input from file")
-@click.option("--var", "-v", help="variable", multiple=True)
 @click.option("--csv", "-c", is_flag=True, default=False, help="display result as csv")
-@click.argument("rules", nargs=-1)
+@click.argument("pattern_definitions", nargs=-1, type=click.UNPROCESSED)
 def count(
     line_sep: str,
     interval_sep: str,
@@ -80,9 +120,8 @@ def count(
     line_number: bool,
     line_text: bool,
     file: IO[str] | None,
-    var: Sequence[str],
-    rules: Sequence[str],
     csv: bool,
+    pattern_definitions: Sequence[str],
 ) -> None:
     """Count patterns in file."""
     text = file_or_stdin(file)
@@ -100,17 +139,24 @@ def count(
     )
 
     sequences = text_to_sequences(text, config)
-    parsed_rules = [parse(rule) for rule in rules]
-    result, bindings = extract_metrics(
-        sequences, parsed_rules, var, in_prefix, out_prefix
-    )
-    patterns = mine_patterns(sequences, parsed_rules, result, bindings)
-    if not csv:
-        display_patterns(sequences, patterns, config)
-    elif len(parsed_rules) == 1:
-        display_single_rule_csv(patterns, config)
-    else:
-        display_multiple_rule_csv(patterns, config)
+
+    for pos, (definitions, source) in enumerate(split_patterns(pattern_definitions)):
+        rules, var = process_patterns(definitions)
+        parsed_rules = [parse(rule) for rule in rules]
+        result, bindings = extract_metrics(
+            sequences, parsed_rules, var, in_prefix, out_prefix
+        )
+        patterns = mine_patterns(sequences, parsed_rules, result, bindings)
+        if not csv:
+            prefix = ""
+            if source:
+                print(f"Pattern definition: {source}")
+                prefix = "  "
+            display_patterns(sequences, patterns, config, prefix)
+        elif len(parsed_rules) == 1:
+            display_single_rule_csv(patterns, pos == 0, source, config)
+        else:
+            display_multiple_rule_csv(patterns, pos == 0, source, config)
 
 
 @main.command()
