@@ -1,11 +1,10 @@
 """Defines operations related to sequences."""
+from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
-from typing import Set
-from typing import Tuple
-from typing import Union
+from typing import Sequence
 
 
 TSequence = List[List[str]]
@@ -23,9 +22,10 @@ class Config:
     intervalsep: str = "-1"
     elementsep: str = " "
     hide_support_zero: bool = True
+    hide_bindings: bool = False
 
 
-def strip_split(text: str, sep: str) -> List[str]:
+def strip_split(text: str, sep: str) -> list[str]:
     """Splits text using separator.
 
     Removes separator from end of text.
@@ -33,15 +33,15 @@ def strip_split(text: str, sep: str) -> List[str]:
     return text.strip().rstrip(sep).strip().split(sep)
 
 
-def text_to_sequences(text: str, config: Union[Config, None] = None) -> List[TSequence]:
+def text_to_sequences(text: str, config: Config | None = None) -> list[TSequence]:
     """Converts text file to sequence."""
     config = config or Config()
-    lines: List[TSequence] = []
+    lines: list[TSequence] = []
     for line in strip_split(text, config.linesep):
         newline: TSequence = []
         lines.append(newline)
         for group in strip_split(line, config.intervalsep):
-            newgroup: List[str] = []
+            newgroup: list[str] = []
             newline.append(newgroup)
             for element in strip_split(group, config.elementsep):
                 if element:
@@ -49,13 +49,39 @@ def text_to_sequences(text: str, config: Union[Config, None] = None) -> List[TSe
     return lines
 
 
+def convert_sequences(
+    sequences: list[TSequence], conversions: dict[str, str], remove: Sequence[str]
+) -> tuple[list[TSequence], list[str]]:
+    """Converts and filters sequences."""
+    failures = []
+    new_sequences: list[TSequence] = []
+    for sequence in sequences:
+        new_sequence: TSequence = []
+        new_sequences.append(new_sequence)
+        for group in sequence:
+            new_group: list[str] = []
+            new_sequence.append(new_group)
+            for element in group:
+                if element not in conversions:
+                    failures.append(element)
+                    continue
+                new_element = conversions[element]
+                for prefix in remove:
+                    if new_element.startswith(prefix):
+                        break
+                else:
+                    new_group.append(new_element)
+
+    return new_sequences, failures
+
+
 def in_out_sequence(
     sequence: TSequence, in_prefix: str = "In", out_prefix: str = "Out"
-) -> Tuple[TSequence, Set[str]]:
+) -> tuple[TSequence, set[str]]:
     """Adds In and Out elements to sequence."""
     newsequence = deepcopy(sequence)
-    all_names: Set[str] = set()
-    current: Set[str] = set()
+    all_names: set[str] = set()
+    current: set[str] = set()
     for interval in newsequence:
         elements = set(interval)
         all_names |= elements

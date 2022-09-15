@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
+from itertools import combinations
 from itertools import product
 from typing import Any
 from typing import Callable
+from typing import Collection
 from typing import Dict
 from typing import Generator
+from typing import List
 from typing import Sequence
 from typing import Set
 from typing import Tuple
+from typing import TypeVar
 from typing import Union
 from typing import cast
 
@@ -191,3 +196,98 @@ def extract_metrics(
                 for old_rule in bindings.backref[rule]:
                     rule_result[old_rule].add(i)
     return rule_result, bindings
+
+
+Number = Union[int, float]
+
+
+@dataclass
+class AssociationItem:
+    """Represents an Association Rule side."""
+
+    name: str
+    lines: Collection[int]
+    support: Number
+
+
+@dataclass
+class AssociationRule:
+    """Represents an Association Rule."""
+
+    lhs: AssociationItem
+    rhs: AssociationItem
+    confidence: Number
+    lift: Number
+
+
+TPatternList = List[Tuple[AssociationItem, List[AssociationRule], TBindingSeq]]
+T = TypeVar("T")
+
+
+def split_rules(
+    rules: Sequence[T],
+) -> Generator[tuple[Sequence[T], Sequence[T]], None, None]:
+    """Generates all possibilities of lhs -> rhs for list of rules."""
+    all_indexes = range(len(rules))
+    for size in range(1, len(rules)):
+        for indexes in combinations(all_indexes, size):
+            lhs = [rules[i] for i in all_indexes if i in indexes]
+            rhs = [rules[i] for i in all_indexes if i not in indexes]
+            yield (lhs, rhs)
+
+
+def divide(left: Number, right: Number) -> Number:
+    """Divides numbers and return nan on division by zero."""
+    try:
+        return left / right
+    except ZeroDivisionError:
+        return float("nan")
+
+
+def mine_rules(
+    sequences: Sequence[TSequence],
+    rules: Sequence[Rule],
+    result: TRuleResult,
+) -> tuple[AssociationItem, list[AssociationRule]]:
+    """Mines rules and association rules from result."""
+    lines = set.intersection(*[result[rule] for rule in rules])
+    int_item = AssociationItem(
+        ", ".join(map(str, rules)), lines, len(lines) / len(sequences)
+    )
+    association_rules = []
+
+    for lhs, rhs in split_rules(rules):
+        lines_lhs = set.intersection(*[result[rule] for rule in lhs])
+        lines_rhs = set.intersection(*[result[rule] for rule in rhs])
+        lhs_item = AssociationItem(
+            ", ".join(map(str, lhs)), lines_lhs, len(lines_lhs) / len(sequences)
+        )
+        rhs_item = AssociationItem(
+            ", ".join(map(str, rhs)), lines_rhs, len(lines_rhs) / len(sequences)
+        )
+        conf = divide(int_item.support, lhs_item.support)
+        lift = divide(conf, rhs_item.support)
+        association_rules.append(AssociationRule(lhs_item, rhs_item, conf, lift))
+
+    return int_item, association_rules
+
+
+def mine_patterns(
+    sequences: Sequence[TSequence],
+    rules: list[Rule],
+    result: TRuleResult,
+    bindings: Bindings,
+) -> TPatternList:
+    """Mines patterns from rules and results."""
+    item, association_rules = mine_rules(sequences, rules, result)
+    patterns: TPatternList = [(item, association_rules, [])]
+
+    for binds, replacements in bindings.enacted.items():
+        if any(isinstance(bind, Unbound) for bind in binds):
+            continue
+        new_rules: list[Rule] = rules[:]
+        for old, new in replacements:
+            new_rules[rules.index(old)] = new
+        item, association_rules = mine_rules(sequences, new_rules, result)
+        patterns.append((item, association_rules, binds))
+    return patterns

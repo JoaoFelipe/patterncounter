@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "patterncounter"
-version = "0.0.2"
+version = "0.1.0"
 description = "PatternCounter"
 authors = ["Joao Felipe Pimentel <joaofelipenp@gmail.com>"]
 license = "MIT"
