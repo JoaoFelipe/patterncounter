@@ -62,7 +62,7 @@ def test_count_succeeds_single_rule_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
         __main__.count,
-        ["X", "-v", "X~A", "--csv"],
+        ["X", "-v", "X~A", "-t", "--csv"],
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
@@ -73,6 +73,28 @@ def test_count_succeeds_single_rule_csv(runner: CliRunner) -> None:
         Name,Support,Lines,Bindings
         X,0.6666666666666666,0; 2,
         B,0.6666666666666666,0; 2,X = B
+        """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
+    )
+
+
+def test_count_succeeds_single_rule_csv_line_numbers(runner: CliRunner) -> None:
+    """It exits with a status code of zero."""
+    result = runner.invoke(
+        __main__.count,
+        ["X", "-v", "X~A", "-n", "--csv"],
+        input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
+    )
+    assert result.exit_code == 0
+    assert (
+        result.output
+        == dedent(
+            """\
+        Name,Support,Line Count,Bindings
+        X,0.6666666666666666,2,
+        B,0.6666666666666666,2,X = B
         """
         )
         .replace("\r\n", "\n")
@@ -122,7 +144,7 @@ def test_count_succeeds_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
         __main__.count,
-        ["[Y X]", "A", "-v", "X~A", "-v", "Y:A", "--csv"],
+        ["[Y X]", "A", "-v", "X~A", "-v", "Y:A", "-t", "--csv"],
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
@@ -140,6 +162,36 @@ def test_count_succeeds_csv(runner: CliRunner) -> None:
             """1.0,1.0,0; 2,0; 1; 2,0; 2,X = B; Y = A
         A,[A B],1.0,0.6666666666666666,0.6666666666666666,"""
             """0.6666666666666666,1.0,0; 1; 2,0; 2,0; 2,X = B; Y = A
+        """
+        )
+        .replace("\r\n", "\n")
+        .replace("\n", os.linesep)
+    )
+
+
+def test_count_succeeds_csv_line_count(runner: CliRunner) -> None:
+    """It exits with a status code of zero."""
+    result = runner.invoke(
+        __main__.count,
+        ["[Y X]", "A", "-v", "X~A", "-v", "Y:A", "-n", "--csv"],
+        input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
+    )
+    assert result.exit_code == 0
+    assert (
+        result.output
+        == dedent(
+            """\
+        LHS,RHS,LHS Support,RHS Support,LHS ==> RHS Support,"""
+            """LHS Line Count,RHS Line Count,LHS ==> RHS Line Count,"""
+            """Confidence,Lift,Bindings
+        [Y X],A,0.6666666666666666,1.0,0.6666666666666666,"""
+            """2,3,2,1.0,1.0,
+        A,[Y X],1.0,0.6666666666666666,0.6666666666666666,"""
+            """3,2,2,0.6666666666666666,1.0,
+        [A B],A,0.6666666666666666,1.0,0.6666666666666666,"""
+            """2,3,2,1.0,1.0,X = B; Y = A
+        A,[A B],1.0,0.6666666666666666,0.6666666666666666,"""
+            """3,2,2,0.6666666666666666,1.0,X = B; Y = A
         """
         )
         .replace("\r\n", "\n")
@@ -214,7 +266,7 @@ def test_count_succeeds_single_rule_no_bindings_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
         __main__.count,
-        ["X", "-v", "X~A", "-b", "--csv"],
+        ["X", "-v", "X~A", "-b", "-t", "--csv"],
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
@@ -235,7 +287,7 @@ def test_count_succeeds_no_bindings_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
         __main__.count,
-        ["[Y X]", "A", "-v", "X~A", "-v", "Y:A", "-b", "--csv"],
+        ["[Y X]", "A", "-v", "X~A", "-v", "Y:A", "-b", "-t", "--csv"],
         input="A -1 A B -1 -2 A -1 -2 A B -1 -2",
     )
     assert result.exit_code == 0
@@ -322,7 +374,7 @@ def test_count_nothing_found(runner: CliRunner) -> None:
 def test_count_single_nothing_found_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
-        __main__.count, ["Z", "--csv"], input="A -1 A B -1 -2 A -1 -2 A B -1 -2"
+        __main__.count, ["Z", "-t", "--csv"], input="A -1 A B -1 -2 A -1 -2 A B -1 -2"
     )
     assert result.exit_code == 0
     assert result.output == ("Name,Support,Lines,Bindings\n").replace(
@@ -333,7 +385,7 @@ def test_count_single_nothing_found_csv(runner: CliRunner) -> None:
 def test_count_multiple_nothing_found_csv(runner: CliRunner) -> None:
     """It exits with a status code of zero."""
     result = runner.invoke(
-        __main__.count, ["Z", "B", "--csv"], input="A -1 A B -1 -2 A -1 -2 A B -1 -2"
+        __main__.count, ["Z", "B", "-t", "--csv"], input="A -1 A B -1 -2 A -1 -2 A B -1 -2"
     )
     assert result.exit_code == 0
     assert result.output == (
